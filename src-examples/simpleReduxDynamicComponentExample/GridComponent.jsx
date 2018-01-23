@@ -1,9 +1,13 @@
 import React, {Component} from "react";
+import _ from 'lodash';
 
 import {AgGridReact} from "ag-grid-react";
 import {connect} from "react-redux";
 
 import PriceRenderer from "./PriceRenderer";
+
+const HotFormulaParser = require('hot-formula-parser');
+import {FORMULAS} from './formulas';
 
 /*
  * This component serves to display the row data (provided by redux)
@@ -21,7 +25,7 @@ class GridComponent extends Component {
                     field: 'price',
                     cellClass: 'align-right',
                     cellRendererFramework: PriceRenderer
-                }
+                },
             ]
         };
 
@@ -33,6 +37,44 @@ class GridComponent extends Component {
         this.columnApi = params.columnApi;
 
         this.gridApi.sizeColumnsToFit();
+    }
+
+    createColumn(headerName, formula) {
+        return {
+            headerName,
+            valueGetter: function (params) {
+                let parser = new HotFormulaParser.Parser();
+                Object.keys(params.data).forEach(q => parser.setVariable(`_${q}`, params.data[q]))
+                let result = parser.parse(formula); // It returns `Object {error: null, result: 14}`
+                const val = result.error ? result.error : result.result;
+                parser = undefined;
+                result = undefined;
+                return val;
+            }
+        };
+    }
+
+    addColumn(e) {
+        e.preventDefault();
+        this.setState({
+            columnDefs: [...this.state.columnDefs, this.createColumn(this.refs.name.value, this.refs.formula.value)]
+        });
+        this.refs.name.value = '';
+        this.refs.formula.value = '';
+    }
+
+    variables() {
+        return _.uniq(_.flatten(this.props.rowData.map(q => Object.keys(q)))).map(q => `_${q}`);
+    }
+
+    formulas() {
+        return HotFormulaParser.SUPPORTED_FORMULAS.map(q => {
+            const formulaDesc = FORMULAS.find(w => w.name === q);
+
+            if(formulaDesc) return formulaDesc;
+
+            return {name: q};
+        });
     }
 
     // row data will be provided via redux on this.props.rowData
@@ -48,6 +90,28 @@ class GridComponent extends Component {
                     // events
                     onGridReady={this.onGridReady}>
                 </AgGridReact>
+                <h3>Available Variables</h3>
+                <ul>
+                {
+                    this.variables().map(q => <li key={q} >{q}</li>)
+                }
+                </ul>
+                <div>{}</div>
+                <form onSubmit={this.addColumn.bind(this)}>
+                    <div className="form-group">
+                        <input name="name" className="form-control" placeholder="name" ref="name"/>
+                    </div>
+                    <div className="form-group">
+                        <input name="formula" className="form-control" placeholder="formula" ref="formula"/>
+                    </div>
+                    <button type="submit" className="btn btn-default">Add new column</button>
+                </form>
+                <h3>Supported Formulas</h3>
+                <ul>
+                {
+                    this.formulas().map((q, i) => <li key={i}><a href={q.link} target="_blank">{q.name}</a> <span>{q.desc}</span></li>)
+                }
+                </ul>
             </div>
         )
     }

@@ -36,7 +36,7 @@ class HeaderComponent extends Component {
     createRowData() {
         let rowData = [];
 
-        for (let i = 0; i < 14; i++) {
+        for (let i = 0; i < 140000; i++) {
             let newItem = this.createItem();
             rowData.push(newItem);
         }
